@@ -1,6 +1,6 @@
 from numbert.operator import BaseOperator
 import math
-from numba import njit
+from numba import njit, f8
 import numpy as np
 from .representation import numbalizer
 
@@ -83,29 +83,6 @@ def is_prime(n):
     return True
 
 
-class SquaresOfPrimes(BaseOperator):
-    signature = 'float(float)'
-
-    def condition(x):
-        out = is_prime(x)
-        return out
-
-    def forward(x):
-        return x**2
-
-
-class EvenPowersOfPrimes(BaseOperator):
-    signature = 'float(float,float)'
-
-    def condition(x, y):
-        b = is_prime(x)
-        a = (y % 2 == 0) and (y > 0) and (y == int(y))
-        return a and b
-
-    def forward(x, y):
-        return x**y
-
-
 class Add(BaseOperator):
     commutes = True
     signature = 'float(float,float)'
@@ -137,13 +114,6 @@ class Multiply(BaseOperator):
     def forward(x, y):
         return x * y
 
-class Multiply2(BaseOperator):
-    commutes = True
-    signature = 'float(float,float)'
-
-    def forward(x, y):
-        return x * y
-
 
 class Divide(BaseOperator):
     commutes = False
@@ -154,29 +124,6 @@ class Divide(BaseOperator):
 
     def forward(x, y):
         return x / y
-
-
-class ConvertNumerator(BaseOperator):
-    commutes = False
-    signature = 'float(float,float,float)'
-
-    def condition(cden, iden, inum):
-        return iden != 0 and iden <= cden
-
-    def forward(cden, iden, inum):
-        return (cden / iden) * inum
-
-
-# class DivideRound(BaseOperator):
-#     commutes = False
-#     signature = 'float(float,float)'
-
-#     def condition(x, y):
-#         return y != 0
-
-#     def forward(x, y):
-#         # Rounding errors start around 9 decimal places out
-#         return np.round(x / y, 12) 
 
 
 class Equals(BaseOperator):
@@ -211,19 +158,6 @@ class Div10(BaseOperator):
         return x // 10
 
 
-class Concatenate(BaseOperator):
-    signature = 'string(string,string)'
-
-    def forward(x, y):
-        return x + y
-
-class Append25(BaseOperator):
-    signature = 'string(string)'
-
-    def forward(x):
-        return x + "25"
-
-
 class StrToFloat(BaseOperator):
     signature = 'float(string)'
     muted_exceptions = [ValueError]
@@ -233,82 +167,121 @@ class StrToFloat(BaseOperator):
         return float(x)
 
 
+class ReverseSign(BaseOperator):
+    signature = 'float(float)'
+    template = "ReverseSign(float)"
+    nopython=False
+    muted_exceptions = [ValueError]
+
+    def forward(x):
+        return -x
+
+
+class VarName(BaseOperator):
+    signature = 'str(str)'
+    template = "VarName({})"
+    nopython=False
+    muted_exceptions = [ValueError]
+
+    def forward(x):
+        return x[x.find(next(filter(str.isalpha, x)))]
+
+
 class FloatToStr(BaseOperator):
     signature = 'string(float)'
+    template = 'FloatToStr({})'
     muted_exceptions = [ValueError]
     nopython = False
 
     def forward(x):
-        # if(int(x) == x):
-        #   return str(int(x))
+        if x == int(x):
+            return str(int(x))
         return str(x)
+
 
 class RipStrValue(BaseOperator):
     signature = 'string(TextField)'
-    template = "{}.v"
+    template = "RipStrValue({})"
     nopython=False
     muted_exceptions = [ValueError]
+
     def forward(x):
         return str(x.value)
 
-class RipFloatValue(BaseOperator):
-    signature = 'float(TextField)'
-    template = "{}.v"
+
+class SkillSubtract(BaseOperator):
+    signature = 'str(float)'
+    template = "SkillSubtract({})"
     nopython=False
     muted_exceptions = [ValueError]
-    def forward(x): 
-        return float(x.value)
 
-class RipFloatValueSymbol(BaseOperator):
-    signature = 'float(Symbol)'
-    template = "{}.v"
+    def forward(x):
+        if x == int(x):
+            x = int(x)
+        return 'subtract ' + str(x)
+
+
+class SkillDivide(BaseOperator):
+    signature = 'str(float)'
+    template = "SkillDivide({})"
     nopython=False
     muted_exceptions = [ValueError]
-    def forward(x): 
-        return float(x.value)
+
+    def forward(x):
+        if x == int(x):
+            x = int(x)
+        return 'divide ' + str(x)
 
 
-class Numerator_Multiply(BaseOperator):
-    signature = 'float(TextField,TextField)'
-    template = "Numerator_Multiply({}.v,{}.v)"
-    nopython=False
+class GetCoefficient(BaseOperator):
+    signature = 'str(str)'
+    template = "GetCoefficient({})"
+    nopython = False
     muted_exceptions = [ValueError]
-    def condition(x,y): 
-        return x.id.split(".R")[1] == y.id.split(".R")[1]
-    def forward(x,y): 
-        return float(x.value) * float(y.value)
 
-class Cross_Multiply(BaseOperator):
-    signature = 'float(TextField,TextField)'
-    template = "Cross_Multiply({}.v,{}.v)"
-    nopython=False
+    def condition(x):
+        i = 0
+        while i < len(x) and x[i] != 'x':
+            i += 1
+        return i < len(x)
+
+    def forward(x):
+        i = 0
+        while i < len(x) and x[i] != 'x':
+            i += 1
+        j = i - 1
+        while x[j].isdigit() or x[j] == '.':
+            j -= 1
+        if j == -1:
+            j += 1
+        if j == '-':
+            j -= 1
+        return x[j: i]
+
+
+class GetBias(BaseOperator):
+    signature = 'str(str)'
+    template = "GetBias({})"
+    nopython = False
     muted_exceptions = [ValueError]
-    def condition(x,y): 
-        return x.id.split(".R")[1] != y.id.split(".R")[1]
-    def forward(x,y): 
-        return float(x.value) * float(y.value)
 
-class Numerator_Multiply_symb(BaseOperator):
-    signature = 'float(TextField,TextField)'
-    template = "Numerator_Multiply({}.v,{}.v)"
-    nopython=False
-    muted_exceptions = [ValueError]
-    def condition(x,y): 
-        return x.id.split("_")[1] == y.id.split("_")[1]
-    def forward(x,y): 
-        return float(x.value) * float(y.value)
+    def condition(x):
+        i = 0
+        while i < len(x) and x[i] != 'x':
+            i += 1
+        return i < len(x)
 
-class Cross_Multiply_symb(BaseOperator):
-    signature = 'float(TextField,TextField)'
-    template = "Cross_Multiply({}.v,{}.v)"
-    nopython=False
-    muted_exceptions = [ValueError]
-    def condition(x,y): 
-        return x.id.split("_")[1] != y.id.split("_")[1]
-    def forward(x,y): 
-        return float(x.value) * float(y.value)
-
-
-
-
-
+    def forward(x):
+        list = x.split('+')
+        for l in list:
+            if not ('x' in l or 'y' in l):
+                i = 0
+                while i < len(l) and (l[i] == '(' or l[i] == ' '):
+                    i += 1
+                l = l[i:]
+                i = len(l) - 1
+                while i >= 0 and (l[i] == ')' or l[i] == ' '):
+                    i -= 1
+                l = l[:i + 1]
+                print('got %s' % l)
+                return l

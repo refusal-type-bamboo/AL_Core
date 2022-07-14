@@ -125,7 +125,7 @@ class NumbaPlanner(BasePlanner):
 					epsilon=0.0,
 					max_solutions=100):
 		print("foci_of_attention:", foci_of_attention)
-		# print("HOW_SEARCH D=", search_depth, "N_ops=",len(operators) if operators is not None else -1)
+		print("HOW_SEARCH D=", search_depth, "N_ops=",len(operators) if operators is not None else -1)
 		assert "value" in sai.inputs, "For now NumbaPlanner only searches for exaplantions of SAIs with inputs['value'] set."
 
 		#Treat Button Presses Specially
